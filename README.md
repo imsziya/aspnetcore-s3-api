@@ -1,71 +1,244 @@
-# aspnetcore-s3-api
-RESTful API built with ASP.NET Core to perform Amazon S3 operations, including file upload, download, and storage management.
+# ASP.NET Core S3 API
 
-## Project Details
+REST API built with ASP.NET Core for common Amazon S3 operations such as bucket management, folder placeholder creation, object upload, object listing, object download, and pre-signed download URL generation.
 
-- **Framework:** ASP.NET Core (see `Src/API.Aspnetcore.S3`)
-- **Features:** create/list buckets, upload/download objects, delete objects, and basic object metadata support.
-- **Key files:** Controllers are in `Src/API.Aspnetcore.S3/Controllers`, services in `Src/API.Aspnetcore.S3/Services`.
+## Tech Stack
 
-## AWS Configuration (via AWS CLI)
+- ASP.NET Core Web API
+- .NET 10
+- AWS SDK for .NET
+- Swagger / OpenAPI
 
-This project expects AWS credentials and configuration to be provided via the AWS CLI. Configure your environment as follows.
+## Project Structure
 
-1. Install the AWS CLI (if not already installed). Follow https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html for platform-specific instructions.
+```text
+.
+├── README.md
+├── LICENSE
+└── Src
+    ├── API.Aspnetcore.S3.slnx
+    └── API.Aspnetcore.S3
+        ├── Controllers
+        │   ├── BucketController.cs
+        │   └── ObjectController.cs
+        ├── Models
+        │   ├── CreateBucketRequest.cs
+        │   └── ObjectResponse.cs
+        ├── Services
+        │   ├── BucketService.cs
+        │   └── ObjectService.cs
+        ├── Program.cs
+        ├── appsettings.json
+        └── API.Aspnetcore.S3.csproj
+```
 
-2. Configure credentials and default region using `aws configure` and provide an IAM user's Access Key ID and Secret Access Key with S3 permissions:
+## Features
+
+- Create an S3 bucket.
+- List all accessible S3 buckets.
+- Delete an S3 bucket.
+- Get a bucket location.
+- Create an S3 folder placeholder by creating an empty object with a trailing slash key.
+- Upload one object.
+- Upload multiple objects.
+- List object keys in a bucket.
+- Download an object.
+- Generate a pre-signed download URL.
+
+`ObjectService` also contains methods for deleting objects and generating pre-signed upload URLs, but those methods are not currently exposed through `ObjectController`.
+
+## Prerequisites
+
+- .NET 10 SDK
+- AWS account with S3 access
+- AWS credentials configured for the AWS SDK default credential chain
+
+The application registers `IAmazonS3` through `AddAWSService<IAmazonS3>()`, so credentials and region are resolved by the standard AWS SDK configuration providers, including environment variables, the shared AWS credentials/config files, and IAM roles when running on AWS infrastructure.
+
+## AWS Configuration
+
+For local development, the simplest setup is to configure the AWS CLI:
 
 ```bash
 aws configure
-# When prompted, enter your Access Key ID, Secret Access Key, default region (e.g. us-east-1), and default output (e.g. json)
 ```
 
-3. (Optional) Use named profiles if you manage multiple accounts or roles:
+Provide:
+
+- AWS Access Key ID
+- AWS Secret Access Key
+- Default AWS Region
+- Default output format, such as `json`
+
+You can also use a named profile:
 
 ```bash
 aws configure --profile myprofile
-# Use the profile by setting AWS_PROFILE=myprofile or configuring the SDK to use it
 export AWS_PROFILE=myprofile
 ```
 
-4. Quick S3 commands to verify access:
+The AWS identity used by the API needs permissions for the S3 operations you call. Common permissions include:
 
-```bash
-# List buckets
-aws s3 ls
+- `s3:ListAllMyBuckets`
+- `s3:CreateBucket`
+- `s3:DeleteBucket`
+- `s3:GetBucketLocation`
+- `s3:ListBucket`
+- `s3:PutObject`
+- `s3:GetObject`
+- `s3:DeleteObject`
 
-# Create a bucket
-aws s3 mb s3://my-test-bucket --region us-east-1
+For production, prefer least-privilege IAM policies and avoid storing long-lived credentials in application configuration.
 
-# Upload a file
-aws s3 cp ./localfile.txt s3://my-test-bucket/
+## Configuration
 
-# Download a file
-aws s3 cp s3://my-test-bucket/localfile.txt ./
-```
-
-5. IAM requirements: the credentials used should have permissions for S3 operations the API needs (e.g., `s3:ListBucket`, `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`). For production use, follow least-privilege principles and consider using IAM roles.
-
-6. Environment integration: the application uses the AWS SDK default credential/provider chain (environment variables, shared credentials file, or IAM role when running on AWS). No additional app-specific credential config is required when AWS CLI is configured.
-
-## Example `appsettings.json`
-
-You can optionally provide application configuration for a default S3 bucket or to reference a named AWS profile. The AWS SDK will still use the standard credential chain unless you explicitly configure credentials in code.
+The checked-in `appsettings.json` only configures logging and allowed hosts:
 
 ```json
 {
-	"S3": {
-		"DefaultBucket": "my-app-bucket",
-		"Region": "us-east-1"
-	},
-	"AWS": {
-		"Profile": "myprofile"
-	}
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
 }
 ```
 
-- **Note:** Storing long-lived credentials in `appsettings.json` is not recommended. Prefer the AWS shared credentials file (`~/.aws/credentials`), environment variables, or IAM roles.
+If you want to configure AWS options explicitly through configuration, the AWS SDK for .NET can read an `AWS` section, for example:
 
-## Local setup script
+```json
+{
+  "AWS": {
+    "Profile": "myprofile",
+    "Region": "us-east-1"
+  }
+}
+```
 
-A helper script is included at `scripts/setup.sh` to assist with common local setup tasks (configure a profile, create a test bucket, verify connectivity).
+Do not commit access keys or secret keys to this file.
+
+## Run Locally
+
+Restore and build:
+
+```bash
+dotnet restore Src/API.Aspnetcore.S3.slnx
+dotnet build Src/API.Aspnetcore.S3.slnx
+```
+
+Run the API:
+
+```bash
+dotnet run --project Src/API.Aspnetcore.S3/API.Aspnetcore.S3.csproj
+```
+
+The launch profile configures these local URLs:
+
+- HTTP: `http://localhost:5260`
+- HTTPS: `https://localhost:7093`
+
+Swagger UI is enabled in the Development environment:
+
+```text
+https://localhost:7093/swagger
+```
+
+## API Endpoints
+
+### Buckets
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/api/buckets` | Create a bucket. |
+| `POST` | `/api/buckets/folder` | Create a folder placeholder in a bucket. |
+| `GET` | `/api/buckets` | List accessible buckets. |
+| `GET` | `/api/buckets/{bucketName}/location` | Get a bucket location. |
+| `DELETE` | `/api/buckets/{bucketName}` | Delete a bucket. |
+
+### Objects
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/api/objects/upload/{bucketName}` | Upload one file as multipart form data. |
+| `POST` | `/api/objects/uploads/{bucketName}` | Upload multiple files as multipart form data. |
+| `GET` | `/api/objects?bucketName={bucketName}` | List object keys in a bucket. |
+| `GET` | `/api/objects/download?bucket={bucketName}&key={objectKey}` | Download an object. |
+| `GET` | `/api/objects/pre-signed-url?bucketName={bucketName}&key={objectKey}&expiryMinutes={minutes}` | Generate a pre-signed download URL. |
+
+## Request Examples
+
+Create a bucket:
+
+```bash
+curl -X POST http://localhost:5260/api/buckets \
+  -H "Content-Type: application/json" \
+  -d '{"bucketName":"my-s3-bucket"}'
+```
+
+Create a folder placeholder:
+
+```bash
+curl -X POST http://localhost:5260/api/buckets/folder \
+  -H "Content-Type: application/json" \
+  -d '{"bucketName":"my-s3-bucket","folderName":"documents"}'
+```
+
+List buckets:
+
+```bash
+curl http://localhost:5260/api/buckets
+```
+
+Upload a file:
+
+```bash
+curl -X POST http://localhost:5260/api/objects/upload/my-s3-bucket \
+  -F "file=@./example.txt"
+```
+
+Upload multiple files:
+
+```bash
+curl -X POST http://localhost:5260/api/objects/uploads/my-s3-bucket \
+  -F "files=@./example-1.txt" \
+  -F "files=@./example-2.txt"
+```
+
+List objects:
+
+```bash
+curl "http://localhost:5260/api/objects?bucketName=my-s3-bucket"
+```
+
+Download an object:
+
+```bash
+curl -L "http://localhost:5260/api/objects/download?bucket=my-s3-bucket&key=example.txt" \
+  -o example.txt
+```
+
+Generate a pre-signed download URL:
+
+```bash
+curl "http://localhost:5260/api/objects/pre-signed-url?bucketName=my-s3-bucket&key=example.txt&expiryMinutes=15"
+```
+
+Delete a bucket:
+
+```bash
+curl -X DELETE http://localhost:5260/api/buckets/my-s3-bucket
+```
+
+## Development Notes
+
+- Swagger and OpenAPI are only mapped when `ASPNETCORE_ENVIRONMENT` is `Development`.
+- Bucket deletion requires the bucket to be empty.
+- Uploaded object keys use the incoming file name.
+- There is no authentication or authorization policy configured in this API yet, even though `UseAuthorization()` is present in the pipeline.
+- Exceptions are not currently translated into custom API error responses, so AWS SDK exceptions may surface as default ASP.NET Core error responses.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
