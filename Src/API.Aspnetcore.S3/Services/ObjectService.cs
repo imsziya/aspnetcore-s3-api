@@ -77,11 +77,7 @@ public class ObjectService(IAmazonS3 _amazonS3) : IObjectService
     public async Task<ObjectResponse> GetObjectsAsync(string bucketName)
     {
         var response = await _amazonS3.ListObjectsAsync(bucketName);
-        return new ObjectResponse
-        {
-            BucketName = bucketName,
-            Keys = [.. response.S3Objects.Select(x => x.Key)],
-        };
+        return new ObjectResponse(bucketName, [.. response.S3Objects.Select(x => x.Key)]);
     }
 
     public async Task<string> UploadFileAsync(string bucketName, IFormFile file)

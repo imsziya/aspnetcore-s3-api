@@ -16,7 +16,7 @@ public class BucketController(IBucketService service) : ControllerBase
         return Ok("Bucket created successfully.");
     }
     [HttpPost("folder")]
-    public async Task<IActionResult> CreateFolderAsync(CreateFoldrRequest request)
+    public async Task<IActionResult> CreateFolderAsync(CreateFolderRequest request)
     {
         await service.CreateFolderAsync(request.BucketName, request.FolderName);
 

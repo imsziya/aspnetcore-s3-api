@@ -9,6 +9,56 @@ REST API built with ASP.NET Core for common Amazon S3 operations such as bucket 
 - AWS SDK for .NET
 - Swagger / OpenAPI
 
+## Architecture
+
+This application uses a simple layered ASP.NET Core Web API architecture. It is organized around HTTP controllers, application services, lightweight models, and the AWS SDK client registered through dependency injection.
+
+The request flow is:
+
+```text
+HTTP Request
+    ↓
+Controller
+    ↓
+Service Interface
+    ↓
+Service Implementation
+    ↓
+AWS SDK IAmazonS3 Client
+    ↓
+Amazon S3
+```
+
+### Layers
+
+| Layer | Location | Responsibility |
+| --- | --- | --- |
+| API / Presentation Layer | `Controllers` | Exposes REST endpoints, receives route/query/body/form-data input, and returns HTTP responses. |
+| Service Layer | `Services` | Contains the application logic for S3 bucket and object operations. Controllers depend on service interfaces instead of directly using the AWS SDK. |
+| Model Layer | `Models` | Defines request and response DTOs used by the API. |
+| Infrastructure / External Service Layer | AWS SDK `IAmazonS3` | Provides access to Amazon S3. The client is registered in `Program.cs` using `AddAWSService<IAmazonS3>()`. |
+| Composition Root | `Program.cs` | Configures controllers, Swagger/OpenAPI, AWS options, dependency injection, middleware, and endpoint mapping. |
+
+### Dependency Injection
+
+Services are registered in `Program.cs`:
+
+```csharp
+builder.Services.AddAWSService<IAmazonS3>();
+builder.Services.AddScoped<IBucketService, BucketService>();
+builder.Services.AddScoped<IObjectService, ObjectService>();
+```
+
+This keeps controllers thin and allows S3-specific logic to live in the service layer:
+
+- `BucketController` depends on `IBucketService`.
+- `ObjectController` depends on `IObjectService`.
+- `BucketService` and `ObjectService` depend on `IAmazonS3`.
+
+### Architectural Style
+
+The project is best described as a monolithic, layered REST API. It is not using Clean Architecture, CQRS, Repository Pattern, MediatR, domain-driven design, or a microservice split. Because the current scope is focused on S3 operations, the layers are intentionally lightweight and live inside a single ASP.NET Core project.
+
 ## Project Structure
 
 ```text
